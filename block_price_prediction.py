@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 # Fetch daily price data for Blockasset (BLOCK) from CoinGecko
 
+
 def fetch_data():
     url = "https://api.coingecko.com/api/v3/coins/blockasset/market_chart"
     params = {
@@ -30,6 +31,7 @@ def fetch_data():
 
 # Preprocess data: scale prices and create sequences
 
+
 def preprocess_data(df, seq_len=5):
     scaler = MinMaxScaler(feature_range=(0, 1))
     scaled = scaler.fit_transform(df[['price']])
@@ -44,6 +46,7 @@ def preprocess_data(df, seq_len=5):
 
 # Build a simple LSTM model
 
+
 def build_lstm_model(input_shape):
     model = Sequential([
         LSTM(50, activation='relu', input_shape=input_shape),
@@ -54,16 +57,19 @@ def build_lstm_model(input_shape):
 
 # Train the LSTM model
 
+
 def train_model(model, X_train, y_train, epochs=50):
     model.fit(X_train, y_train, epochs=epochs, verbose=0)
     return model
 
 # Predict the next day price using the last sequence
 
+
 def predict_next_day(model, last_sequence, scaler):
     pred_scaled = model.predict(last_sequence, verbose=0)
     pred_price = scaler.inverse_transform(pred_scaled)
     return pred_price[0, 0]
+
 
 if __name__ == "__main__":
     df = fetch_data()
@@ -80,7 +86,9 @@ if __name__ == "__main__":
     last_100 = df[-100:].copy()
     last_100['Predicted'] = np.nan
     last_100.iloc[-1, last_100.columns.get_loc('Predicted')] = next_day_price
-    last_100[['price', 'Predicted']].plot(title="Blockasset (BLOCK) Price Prediction")
+    last_100[['price', 'Predicted']].plot(
+        title="Blockasset (BLOCK) Price Prediction"
+    )
     plt.xlabel("Date")
     plt.ylabel("Price (USD)")
     plt.show()
