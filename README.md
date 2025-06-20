@@ -4,7 +4,7 @@ This repository contains a simple script to predict the Blockasset (BLOCK) price
 
 ## Installation
 
-Install the Python dependencies:
+Install the Python dependencies (it's recommended to do this inside a virtual environment):
 
 ```
 pip install -r requirements.txt
@@ -14,6 +14,14 @@ pip install -r requirements.txt
 
 Run the prediction script:
 
+The script downloads the latest price data from CoinGecko, trains an LSTM model and prints the predicted next day price. After training a chart window will open showing recent prices along with the prediction.
+
 ```
 python block_price_prediction.py
+```
+
+Example output:
+
+```
+Predicted next day price: $0.1234
 ```
