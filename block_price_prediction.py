@@ -20,7 +20,7 @@ def fetch_data():
     }
     headers = {"accept": "application/json"}
     try:
-        resp = requests.get(url, params=params, headers=headers)
+        resp = requests.get(url, params=params, headers=headers, timeout=10)
         resp.raise_for_status()
     except requests.RequestException as exc:
         print(f"Error fetching data from CoinGecko: {exc}")
