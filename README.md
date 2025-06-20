@@ -17,3 +17,10 @@ Run the prediction script:
 ```
 python block_price_prediction.py
 ```
+
+The chart will be saved to `prediction.png` in the current directory. Use the
+`--show` flag if you want to display the plot as well:
+
+```
+python block_price_prediction.py --show
+```
