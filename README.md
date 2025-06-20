@@ -20,8 +20,10 @@ The script downloads the latest price data from CoinGecko, trains an LSTM model 
 python block_price_prediction.py
 ```
 
-Example output:
+The chart will be saved to `prediction.png` in the current directory. Use the
+`--show` flag if you want to display the plot as well:
 
 ```
-Predicted next day price: $0.1234
+python block_price_prediction.py --show
+
 ```

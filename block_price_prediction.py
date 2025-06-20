@@ -5,6 +5,7 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense
 import matplotlib.pyplot as plt
+import argparse
 
 # Fetch daily price data for Blockasset (BLOCK) from CoinGecko
 
@@ -76,6 +77,16 @@ def predict_next_day(model, last_sequence, scaler):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Predict Blockasset prices using an LSTM model"
+    )
+    parser.add_argument(
+        "--show",
+        action="store_true",
+        help="Display the plot after saving it to disk",
+    )
+    args = parser.parse_args()
+
     df = fetch_data()
     X, y, scaler = preprocess_data(df)
     model = build_lstm_model((X.shape[1], X.shape[2]))
@@ -95,4 +106,6 @@ if __name__ == "__main__":
     )
     plt.xlabel("Date")
     plt.ylabel("Price (USD)")
-    plt.show()
+    plt.savefig("prediction.png")
+    if args.show:
+        plt.show()
