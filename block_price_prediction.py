@@ -97,15 +97,21 @@ if __name__ == "__main__":
     next_day_price = predict_next_day(model, last_sequence, scaler)
     print(f"Predicted next day price: ${next_day_price:.4f}")
 
-    # Plot the last 100 actual prices and the prediction
+    # Plot the last 100 actual prices
     last_100 = df[-100:].copy()
-    last_100['Predicted'] = np.nan
-    last_100.iloc[-1, last_100.columns.get_loc('Predicted')] = next_day_price
-    last_100[['price', 'Predicted']].plot(
-        title="Blockasset (BLOCK) Price Prediction"
+    ax = last_100['price'].plot(
+        title="Blockasset (BLOCK) Price Prediction",
+        label="Actual",
     )
-    plt.xlabel("Date")
-    plt.ylabel("Price (USD)")
+
+    # Draw a line from the last actual price to the predicted next day price
+    pred_dates = [last_100.index[-1], last_100.index[-1] + pd.Timedelta(days=1)]
+    pred_values = [last_100['price'].iloc[-1], next_day_price]
+    ax.plot(pred_dates, pred_values, label="Predicted", color="orange")
+
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Price (USD)")
+    ax.legend()
     plt.savefig("prediction.png")
     if args.show:
         plt.show()
