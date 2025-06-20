@@ -17,8 +17,12 @@ def fetch_data():
         "interval": "daily",
     }
     headers = {"accept": "application/json"}
-    resp = requests.get(url, params=params, headers=headers)
-    resp.raise_for_status()
+    try:
+        resp = requests.get(url, params=params, headers=headers)
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        print(f"Error fetching data from CoinGecko: {exc}")
+        return pd.DataFrame()
     data = resp.json()
     # Extract timestamps and prices
     prices = data.get("prices", [])
