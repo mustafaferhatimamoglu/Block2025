@@ -113,6 +113,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     df = fetch_data()
+    start_date = df.index[0]
+    print(f"Training data starts at {start_date:%Y-%m-%d %H:%M:%S}")
     # Show the date range of the fetched data
     if not df.empty:
         print(f"Data start: {df.index[0]}  Data end: {df.index[-1]}")
