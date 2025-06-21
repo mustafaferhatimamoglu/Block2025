@@ -1,43 +1,60 @@
-import requests
-import pandas as pd
-import numpy as np
-from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense
-import matplotlib.pyplot as plt
 import argparse
+import time
+from typing import List
 
-# Fetch daily price data for Blockasset (BLOCK) from CoinGecko
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import requests
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.layers import LSTM, Dense
+from tensorflow.keras.models import Sequential
+
+# Fetch hourly price data for Blockasset (BLOCK) from CoinGecko
 
 
-def fetch_data():
-    url = "https://api.coingecko.com/api/v3/coins/blockasset/market_chart"
-    params = {
-        "vs_currency": "usd",
-        # using a fixed window as CoinGecko may reject very large ranges
-        "days": 365,
-        "interval": "daily",
-    }
+def fetch_data() -> pd.DataFrame:
+    """Fetch hourly price data for Blockasset from the last year."""
+
+    end_ts = int(time.time())
+    # CoinGecko limits historical range for free tier. Use the last year.
+    start_ts = end_ts - 365 * 24 * 3600
+    step = 90 * 24 * 3600  # 90 days
+    url = "https://api.coingecko.com/api/v3/coins/blockasset/market_chart/range"
+
+    all_prices: List[List[int]] = []
     headers = {"accept": "application/json"}
-    try:
-        resp = requests.get(url, params=params, headers=headers, timeout=10)
-        resp.raise_for_status()
-    except requests.RequestException as exc:
-        print(f"Error fetching data from CoinGecko: {exc}")
-        return pd.DataFrame()
-    data = resp.json()
-    # Extract timestamps and prices
-    prices = data.get("prices", [])
-    df = pd.DataFrame(prices, columns=["timestamp", "price"])
-    df['date'] = pd.to_datetime(df['timestamp'], unit='ms')
-    df.set_index('date', inplace=True)
-    df.drop('timestamp', axis=1, inplace=True)
-    return df
+
+    cur = start_ts
+    while cur < end_ts:
+        params = {
+            "vs_currency": "usd",
+            "from": cur,
+            "to": min(cur + step, end_ts),
+        }
+        try:
+            resp = requests.get(url, params=params, headers=headers, timeout=10)
+            resp.raise_for_status()
+        except requests.RequestException as exc:
+            print(f"Error fetching data from CoinGecko: {exc}")
+            break
+        data = resp.json()
+        prices = data.get("prices", [])
+        all_prices.extend(prices)
+        cur += step
+        time.sleep(1)
+
+    df = pd.DataFrame(all_prices, columns=["timestamp", "price"])
+    df["date"] = pd.to_datetime(df["timestamp"], unit="ms")
+    df.set_index("date", inplace=True)
+    df = df[~df.index.duplicated(keep="first")]
+    df.drop("timestamp", axis=1, inplace=True)
+    return df.sort_index()
 
 # Preprocess data: scale prices and create sequences
 
 
-def preprocess_data(df, seq_len=5):
+def preprocess_data(df, seq_len: int = 24):
     scaler = MinMaxScaler(feature_range=(0, 1))
     scaled = scaler.fit_transform(df[['price']])
     sequences = []
@@ -70,10 +87,17 @@ def train_model(model, X_train, y_train, epochs=50):
 # Predict the next day price using the last sequence
 
 
-def predict_next_day(model, last_sequence, scaler):
-    pred_scaled = model.predict(last_sequence, verbose=0)
-    pred_price = scaler.inverse_transform(pred_scaled)
-    return pred_price[0, 0]
+def predict_next_hours(model, last_sequence, scaler, hours: int = 24) -> np.ndarray:
+    """Predict the next `hours` prices using an autoregressive approach."""
+
+    seq = last_sequence.copy()
+    preds = []
+    for _ in range(hours):
+        pred_scaled = model.predict(seq, verbose=0)
+        preds.append(pred_scaled[0, 0])
+        seq = np.append(seq[:, 1:, :], pred_scaled.reshape(1, 1, 1), axis=1)
+    preds = scaler.inverse_transform(np.array(preds).reshape(-1, 1))
+    return preds.flatten()
 
 
 if __name__ == "__main__":
@@ -92,10 +116,12 @@ if __name__ == "__main__":
     model = build_lstm_model((X.shape[1], X.shape[2]))
     model = train_model(model, X, y, epochs=50)
 
-    # Use the last seq_len days to predict the next day
+    # Use the last seq_len hours to predict the next 24 hours
     last_sequence = X[-1:]
-    next_day_price = predict_next_day(model, last_sequence, scaler)
-    print(f"Predicted next day price: ${next_day_price:.4f}")
+    next_hours = predict_next_hours(model, last_sequence, scaler, hours=24)
+    print("Next 24h predictions:")
+    for i, price in enumerate(next_hours, 1):
+        print(f"Hour +{i}: ${price:.4f}")
 
     # Plot the last 100 actual prices
     last_100 = df[-100:].copy()
@@ -104,10 +130,9 @@ if __name__ == "__main__":
         label="Actual",
     )
 
-    # Draw a line from the last actual price to the predicted next day price
-    pred_dates = [last_100.index[-1], last_100.index[-1] + pd.Timedelta(days=1)]
-    pred_values = [last_100['price'].iloc[-1], next_day_price]
-    ax.plot(pred_dates, pred_values, label="Predicted", color="orange")
+    # Draw predicted hourly prices for the next 24 hours
+    pred_dates = [last_100.index[-1] + pd.Timedelta(hours=i) for i in range(1, 25)]
+    ax.plot(pred_dates, next_hours, label="Predicted", color="orange")
 
     ax.set_xlabel("Date")
     ax.set_ylabel("Price (USD)")
