@@ -71,11 +71,10 @@ def preprocess_data(df, seq_len=24):
 
 def build_lstm_model(input_shape):
     """Build a simple LSTM model without the Keras input shape warning."""
-    model = Sequential([
-        Input(shape=input_shape),
-        LSTM(50, activation='relu'),
-        Dense(1)
-    ])
+    model = Sequential()
+    model.add(Input(shape=input_shape))
+    model.add(LSTM(50, activation='relu'))
+    model.add(Dense(1))
     model.compile(optimizer='adam', loss='mse')
     return model
 
