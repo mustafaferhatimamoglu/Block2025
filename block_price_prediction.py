@@ -17,14 +17,12 @@ from tensorflow.keras.models import Sequential
 def fetch_data() -> pd.DataFrame:
     """Fetch hourly price data for Blockasset from the last year."""
 
-def fetch_data():
-    url = "https://api.coingecko.com/api/v3/coins/blockasset/market_chart"
-    params = {
-        "vs_currency": "usd",
-        # fetch the entire available history at an hourly interval
-        "days": "max",
-        "interval": "hourly",
-    }
+    end_ts = int(time.time())
+    start_ts = end_ts - 365 * 24 * 3600
+    step = 90 * 24 * 3600  # 90 days
+    url = "https://api.coingecko.com/api/v3/coins/blockasset/market_chart/range"
+
+    all_prices: List[List[int]] = []
     headers = {"accept": "application/json"}
 
     cur = start_ts
