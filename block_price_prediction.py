@@ -1,14 +1,21 @@
-import requests
-import pandas as pd
-import numpy as np
-from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense
-import matplotlib.pyplot as plt
 import argparse
+import time
+from typing import List
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import requests
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.layers import LSTM, Dense
+from tensorflow.keras.models import Sequential
 
 # Fetch hourly price data for Blockasset (BLOCK) from CoinGecko
 
+# Fetch hourly price data for Blockasset (BLOCK) from CoinGecko
+
+def fetch_data() -> pd.DataFrame:
+    """Fetch hourly price data for Blockasset from the last year."""
 
 def fetch_data():
     url = "https://api.coingecko.com/api/v3/coins/blockasset/market_chart"
@@ -19,20 +26,32 @@ def fetch_data():
         "interval": "hourly",
     }
     headers = {"accept": "application/json"}
-    try:
-        resp = requests.get(url, params=params, headers=headers, timeout=10)
-        resp.raise_for_status()
-    except requests.RequestException as exc:
-        print(f"Error fetching data from CoinGecko: {exc}")
-        return pd.DataFrame()
-    data = resp.json()
-    # Extract timestamps and prices
-    prices = data.get("prices", [])
-    df = pd.DataFrame(prices, columns=["timestamp", "price"])
-    df['date'] = pd.to_datetime(df['timestamp'], unit='ms')
-    df.set_index('date', inplace=True)
-    df.drop('timestamp', axis=1, inplace=True)
-    return df
+
+    cur = start_ts
+    while cur < end_ts:
+        params = {
+            "vs_currency": "usd",
+            "from": cur,
+            "to": min(cur + step, end_ts),
+        }
+        try:
+            resp = requests.get(url, params=params, headers=headers, timeout=10)
+            resp.raise_for_status()
+        except requests.RequestException as exc:
+            print(f"Error fetching data from CoinGecko: {exc}")
+            break
+        data = resp.json()
+        prices = data.get("prices", [])
+        all_prices.extend(prices)
+        cur += step
+        time.sleep(1)
+
+    df = pd.DataFrame(all_prices, columns=["timestamp", "price"])
+    df["date"] = pd.to_datetime(df["timestamp"], unit="ms")
+    df.set_index("date", inplace=True)
+    df = df[~df.index.duplicated(keep="first")]
+    df.drop("timestamp", axis=1, inplace=True)
+    return df.sort_index()
 
 # Preprocess data: scale prices and create hourly sequences
 
