@@ -12,17 +12,19 @@ from tensorflow.keras.models import Sequential
 
 # Fetch hourly price data for Blockasset (BLOCK) from CoinGecko
 
+# Fetch hourly price data for Blockasset (BLOCK) from CoinGecko
 
 def fetch_data() -> pd.DataFrame:
     """Fetch hourly price data for Blockasset from the last year."""
 
-    end_ts = int(time.time())
-    # CoinGecko limits historical range for free tier. Use the last year.
-    start_ts = end_ts - 365 * 24 * 3600
-    step = 90 * 24 * 3600  # 90 days
-    url = "https://api.coingecko.com/api/v3/coins/blockasset/market_chart/range"
-
-    all_prices: List[List[int]] = []
+def fetch_data():
+    url = "https://api.coingecko.com/api/v3/coins/blockasset/market_chart"
+    params = {
+        "vs_currency": "usd",
+        # fetch the entire available history at an hourly interval
+        "days": "max",
+        "interval": "hourly",
+    }
     headers = {"accept": "application/json"}
 
     cur = start_ts
@@ -51,10 +53,10 @@ def fetch_data() -> pd.DataFrame:
     df.drop("timestamp", axis=1, inplace=True)
     return df.sort_index()
 
-# Preprocess data: scale prices and create sequences
+# Preprocess data: scale prices and create hourly sequences
 
 
-def preprocess_data(df, seq_len: int = 24):
+def preprocess_data(df, seq_len=24):
     scaler = MinMaxScaler(feature_range=(0, 1))
     scaled = scaler.fit_transform(df[['price']])
     sequences = []
@@ -84,20 +86,19 @@ def train_model(model, X_train, y_train, epochs=50):
     model.fit(X_train, y_train, epochs=epochs, verbose=0)
     return model
 
-# Predict the next day price using the last sequence
+# Predict the next n hours using the last sequence
 
 
-def predict_next_hours(model, last_sequence, scaler, hours: int = 24) -> np.ndarray:
-    """Predict the next `hours` prices using an autoregressive approach."""
-
-    seq = last_sequence.copy()
-    preds = []
-    for _ in range(hours):
-        pred_scaled = model.predict(seq, verbose=0)
-        preds.append(pred_scaled[0, 0])
-        seq = np.append(seq[:, 1:, :], pred_scaled.reshape(1, 1, 1), axis=1)
-    preds = scaler.inverse_transform(np.array(preds).reshape(-1, 1))
-    return preds.flatten()
+def predict_next_hours(model, last_sequence, scaler, n_hours=24):
+    """Iteratively predict the next `n_hours` prices."""
+    seq = last_sequence[0]
+    predictions = []
+    for _ in range(n_hours):
+        pred_scaled = model.predict(seq[np.newaxis, :, :], verbose=0)
+        predictions.append(pred_scaled[0, 0])
+        seq = np.vstack([seq[1:], pred_scaled[0]])
+    preds = scaler.inverse_transform(np.array(predictions).reshape(-1, 1))
+    return preds[:, 0]
 
 
 if __name__ == "__main__":
@@ -118,9 +119,9 @@ if __name__ == "__main__":
 
     # Use the last seq_len hours to predict the next 24 hours
     last_sequence = X[-1:]
-    next_hours = predict_next_hours(model, last_sequence, scaler, hours=24)
-    print("Next 24h predictions:")
-    for i, price in enumerate(next_hours, 1):
+    next_prices = predict_next_hours(model, last_sequence, scaler, n_hours=24)
+    print("Next 24 hour predictions:")
+    for i, price in enumerate(next_prices, start=1):
         print(f"Hour +{i}: ${price:.4f}")
 
     # Plot the last 100 actual prices
@@ -130,9 +131,15 @@ if __name__ == "__main__":
         label="Actual",
     )
 
-    # Draw predicted hourly prices for the next 24 hours
+    # Plot predicted next 24 hours as a line starting from the last actual point
     pred_dates = [last_100.index[-1] + pd.Timedelta(hours=i) for i in range(1, 25)]
-    ax.plot(pred_dates, next_hours, label="Predicted", color="orange")
+    pred_values = next_prices
+    ax.plot(
+        [last_100.index[-1]] + pred_dates,
+        [last_100['price'].iloc[-1]] + pred_values.tolist(),
+        label="Predicted",
+        color="orange",
+    )
 
     ax.set_xlabel("Date")
     ax.set_ylabel("Price (USD)")
