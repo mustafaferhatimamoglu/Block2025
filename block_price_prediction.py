@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import requests
 from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.layers import LSTM, Dense
+from tensorflow.keras.layers import LSTM, Dense, Input
 from tensorflow.keras.models import Sequential
 
 # Fetch hourly price data for Blockasset (BLOCK) from CoinGecko
@@ -70,8 +70,10 @@ def preprocess_data(df, seq_len=24):
 
 
 def build_lstm_model(input_shape):
+    """Build a simple LSTM model without the Keras input shape warning."""
     model = Sequential([
-        LSTM(50, activation='relu', input_shape=input_shape),
+        Input(shape=input_shape),
+        LSTM(50, activation='relu'),
         Dense(1)
     ])
     model.compile(optimizer='adam', loss='mse')
@@ -111,6 +113,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     df = fetch_data()
+    # Show the date range of the fetched data
+    if not df.empty:
+        print(f"Data start: {df.index[0]}  Data end: {df.index[-1]}")
     X, y, scaler = preprocess_data(df)
     model = build_lstm_model((X.shape[1], X.shape[2]))
     model = train_model(model, X, y, epochs=50)
@@ -130,14 +135,11 @@ if __name__ == "__main__":
     )
 
     # Plot predicted next 24 hours as a line starting from the last actual point
-    pred_dates = [last_100.index[-1] + pd.Timedelta(hours=i) for i in range(1, 25)]
-    pred_values = next_prices
-    ax.plot(
-        [last_100.index[-1]] + pred_dates,
-        [last_100['price'].iloc[-1]] + pred_values.tolist(),
-        label="Predicted",
-        color="orange",
-    )
+    pred_dates = pd.date_range(last_100.index[-1], periods=25, freq="H")
+    pred_series = pd.Series([
+        last_100["price"].iloc[-1]
+    ] + next_prices.tolist(), index=pred_dates)
+    pred_series.plot(ax=ax, label="Predicted", color="orange")
 
     ax.set_xlabel("Date")
     ax.set_ylabel("Price (USD)")
