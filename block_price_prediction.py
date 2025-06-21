@@ -135,10 +135,12 @@ if __name__ == "__main__":
     )
 
     # Plot predicted next 24 hours as a line starting from the last actual point
-    pred_dates = pd.date_range(last_100.index[-1], periods=25, freq="H")
-    pred_series = pd.Series([
-        last_100["price"].iloc[-1]
-    ] + next_prices.tolist(), index=pred_dates)
+    pred_dates = [last_100.index[-1] + pd.Timedelta(hours=i) for i in range(1, 25)]
+    pred_values = next_prices
+    pred_series = pd.Series(
+        [last_100['price'].iloc[-1]] + pred_values.tolist(),
+        index=[last_100.index[-1]] + pred_dates,
+    )
     pred_series.plot(ax=ax, label="Predicted", color="orange")
 
     ax.set_xlabel("Date")
