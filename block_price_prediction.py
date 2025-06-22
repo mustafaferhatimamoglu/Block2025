@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import requests
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'       # suppress INFO and WARNING logs
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'       # suppress INFO, WARNING, and ERROR logs
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'      # disable GPU detection
 import tensorflow as tf
 tf.get_logger().setLevel('ERROR')
