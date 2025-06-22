@@ -4,7 +4,7 @@ This repository contains a simple script to predict the Blockasset (BLOCK) price
 
 ## Installation
 
-Install the Python dependencies (it's recommended to do this inside a virtual environment):
+Install the Python dependencies (it's recommended to do this inside a virtual environment). The requirements use the CPU-only TensorFlow build, which avoids CUDA-related errors:
 
 ```
 pip install -r requirements.txt
