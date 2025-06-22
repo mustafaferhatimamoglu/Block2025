@@ -35,7 +35,10 @@ python block_price_prediction.py --show
 
 ```
 
+## Trade Simulation
 
+A simple script `trade_simulation.py` shows a hypothetical trading example. It starts with $100 on 2025-03-01 and applies a 0.2% commission to each buy and sell. Run it with:
 
-.venv/bin/pip install -r requirements.txt 
-.venv/bin/python block_price_prediction.py 
+```bash
+python trade_simulation.py
+```
