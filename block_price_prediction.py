@@ -120,6 +120,12 @@ if __name__ == "__main__":
         default=50,
         help="Number of training epochs (default: 50)",
     )
+    parser.add_argument(
+        "--hours",
+        type=int,
+        default=24,
+        help="Number of hours to predict (default: 24)",
+    )
     args = parser.parse_args()
 
     df = fetch_data()
@@ -132,10 +138,10 @@ if __name__ == "__main__":
     model = build_lstm_model((X.shape[1], X.shape[2]))
     model = train_model(model, X, y, epochs=args.epochs)
 
-    # Use the last seq_len hours to predict the next 24 hours
+    # Use the last seq_len hours to predict the requested number of hours
     last_sequence = X[-1:]
-    next_prices = predict_next_hours(model, last_sequence, scaler, n_hours=24)
-    print("Next 24 hour predictions:")
+    next_prices = predict_next_hours(model, last_sequence, scaler, n_hours=args.hours)
+    print(f"Next {args.hours} hour predictions:")
     for i, price in enumerate(next_prices, start=1):
         print(f"Hour +{i}: ${price:.4f}")
 
@@ -146,8 +152,8 @@ if __name__ == "__main__":
         label="Actual",
     )
 
-    # Plot predicted next 24 hours as a line starting from the last actual point
-    pred_dates = [last_100.index[-1] + pd.Timedelta(hours=i) for i in range(1, 25)]
+    # Plot predicted next hours as a line starting from the last actual point
+    pred_dates = [last_100.index[-1] + pd.Timedelta(hours=i) for i in range(1, args.hours + 1)]
     pred_values = next_prices
     pred_series = pd.Series(
         [last_100['price'].iloc[-1]] + pred_values.tolist(),

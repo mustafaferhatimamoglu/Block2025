@@ -21,7 +21,7 @@ CUDA-related errors.
 
 Run the prediction script:
 
-The script downloads the latest price data from CoinGecko, trains an LSTM model and prints the predicted next day price. After training a chart window will open showing recent prices along with the prediction.
+The script downloads the latest price data from CoinGecko, trains an LSTM model and prints the predicted prices for the next 24 hours by default. After training a chart window will open showing recent prices along with the prediction.
 
 ```
 python block_price_prediction.py
@@ -34,6 +34,13 @@ number of training epochs with the `--epochs` option:
 ```
 python block_price_prediction.py --show --epochs 5
 
+```
+
+You can adjust how many hours to predict with the `--hours` option. For
+example, to predict the next 12 hours:
+
+```
+python block_price_prediction.py --hours 12
 ```
 
 ## Trade Simulation
