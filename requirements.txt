@@ -2,5 +2,5 @@ requests
 pandas
 numpy
 scikit-learn
-tensorflow
+tensorflow-cpu
 matplotlib

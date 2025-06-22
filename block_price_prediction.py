@@ -10,6 +10,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'       # suppress INFO, WARNING, and ERROR logs
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'      # disable GPU detection
 import tensorflow as tf
+tf.config.set_visible_devices([], 'GPU')       # explicitly disable GPU detection
 tf.get_logger().setLevel('ERROR')
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.layers import LSTM, Dense, Input
@@ -17,7 +18,6 @@ from tensorflow.keras.models import Sequential
 
 # Fetch hourly price data for Blockasset (BLOCK) from CoinGecko
 
-# Fetch hourly price data for Blockasset (BLOCK) from CoinGecko
 
 def fetch_data() -> pd.DataFrame:
     """Fetch hourly price data for Blockasset from the last year."""
