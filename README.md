@@ -27,37 +27,18 @@ prices are cached in `block_prices.csv`; if this file is newer than 24 hours the
 data is loaded from disk instead of downloading again. After training a chart
 window will open showing recent prices along with the prediction.
 
-```
-python block_price_prediction.py
-```
-
-The chart will be saved to `prediction.png` in the current directory. Use the
-`--show` flag if you want to display the plot as well. You can also control the
-number of training epochs with the `--epochs` option:
-
-```
-python block_price_prediction.py --show --epochs 5
-
+```bash
+python block_analysis.py
 ```
 
-You can adjust how many hours to predict with the `--hours` option. For
-example, to predict the next 12 hours:
-
-```
-python block_price_prediction.py --hours 12
-```
+The script computes several technical indicators, trains an LSTM model and
+predicts the next 24 hours of prices. Results are written to `predictions.csv`
+and `prediction.png`. A small trade simulation is executed automatically and
+printed to the console.
 
 ## Trade Simulation
 
-A simple script `trade_simulation.py` shows a hypothetical trading example. It starts with $100 on 2025-03-01 and applies a 0.2% commission to each buy and sell. Run it with:
-
-```bash
-python trade_simulation.py
-```
-do not change 
-@
-.venv/bin/pip install -r requirements.txt 
-.venv/bin/python block_price_prediction.py 
-.venv/bin/python trade_simulation.py
-@
+The previous standalone `trade_simulation.py` has been incorporated into
+`block_analysis.py`. When you run the analysis script a short example simulation
+is executed automatically and the monthly balances are printed.
 
