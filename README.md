@@ -42,3 +42,13 @@ The previous standalone `trade_simulation.py` has been incorporated into
 `block_analysis.py`. When you run the analysis script a short example simulation
 is executed automatically and the monthly balances are printed.
 
+
+## Fetching OHLC Data
+
+Use `fetch_ohlc.py` to download open, high, low and close prices from CoinGecko. The script prints the first few rows or saves them to CSV.
+
+```bash
+python fetch_ohlc.py bitcoin --days 30 --outfile btc_ohlc.csv
+```
+
+The `days` option accepts `1, 7, 14, 30, 90, 180, 365` or `max`.
