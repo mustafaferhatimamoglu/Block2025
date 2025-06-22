@@ -45,10 +45,12 @@ is executed automatically and the monthly balances are printed.
 
 ## Fetching OHLC Data
 
-Use `fetch_ohlc.py` to download open, high, low and close prices from CoinGecko. The script prints the first few rows or saves them to CSV.
+Use `fetch_ohlc.py` to download open, high, low and close prices for the
+Blockasset token from CoinGecko.
 
 ```bash
-python fetch_ohlc.py bitcoin --days 30 --outfile btc_ohlc.csv
+python fetch_ohlc.py
 ```
 
-The `days` option accepts `1, 7, 14, 30, 90, 180, 365` or `max`.
+The script fetches the last 30 days of hourly data and prints the first few
+rows to the console.
