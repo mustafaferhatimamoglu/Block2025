@@ -34,3 +34,8 @@ The chart will be saved to `prediction.png` in the current directory. Use the
 python block_price_prediction.py --show
 
 ```
+
+
+
+.venv/bin/pip install -r requirements.txt 
+.venv/bin/python block_price_prediction.py 
