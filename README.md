@@ -53,6 +53,7 @@ history length with `--days` (maximum 365).
 
 ```bash
 python fetch_ohlc.py --outfile my_data.csv --days 120
+
 ```
 
 The script prints the first few rows of data and reports how many entries
