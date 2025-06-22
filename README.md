@@ -42,3 +42,10 @@ A simple script `trade_simulation.py` shows a hypothetical trading example. It s
 ```bash
 python trade_simulation.py
 ```
+do not change 
+@
+.venv/bin/pip install -r requirements.txt 
+.venv/bin/python block_price_prediction.py 
+.venv/bin/python trade_simulation.py
+@
+
