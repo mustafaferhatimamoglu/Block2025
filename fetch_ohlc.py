@@ -1,4 +1,5 @@
 
+import argparse
 import requests
 import pandas as pd
 
@@ -23,8 +24,21 @@ def fetch_ohlc() -> pd.DataFrame:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Fetch OHLC data for Blockasset and save to CSV"
+    )
+    parser.add_argument(
+        "--outfile",
+        "-o",
+        default="ohlc.csv",
+        help="Output CSV file (default: ohlc.csv)",
+    )
+    args = parser.parse_args()
+
     df = fetch_ohlc()
+    df.to_csv(args.outfile)
     print(df.head())
+    print(f"Saved {len(df)} rows to {args.outfile}")
 
 
 if __name__ == "__main__":
