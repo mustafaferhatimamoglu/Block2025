@@ -28,10 +28,11 @@ python block_price_prediction.py
 ```
 
 The chart will be saved to `prediction.png` in the current directory. Use the
-`--show` flag if you want to display the plot as well:
+`--show` flag if you want to display the plot as well. You can also control the
+number of training epochs with the `--epochs` option:
 
 ```
-python block_price_prediction.py --show
+python block_price_prediction.py --show --epochs 5
 
 ```
 
@@ -42,10 +43,11 @@ A simple script `trade_simulation.py` shows a hypothetical trading example. It s
 ```bash
 python trade_simulation.py
 ```
-do not change 
-@
-.venv/bin/pip install -r requirements.txt 
-.venv/bin/python block_price_prediction.py 
-.venv/bin/python trade_simulation.py
-@
+
+To evaluate prediction accuracy on recent data, pass `--compare` to train on
+all but the last 24 hours and print predicted versus actual prices:
+
+```bash
+python block_price_prediction.py --epochs 5 --compare
+```
 

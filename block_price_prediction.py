@@ -114,40 +114,69 @@ if __name__ == "__main__":
         action="store_true",
         help="Display the plot after saving it to disk",
     )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=50,
+        help="Number of training epochs (default: 50)",
+    )
+    parser.add_argument(
+        "--compare",
+        action="store_true",
+        help="Compare predictions with the last 24 hours of real data",
+    )
     args = parser.parse_args()
 
     df = fetch_data()
     start_date = df.index[0]
     print(f"Training data starts at {start_date:%Y-%m-%d %H:%M:%S}")
-    # Show the date range of the fetched data
     if not df.empty:
         print(f"Data start: {df.index[0]}  Data end: {df.index[-1]}")
-    X, y, scaler = preprocess_data(df)
+
+    if args.compare and len(df) > 24:
+        train_df = df[:-24]
+        test_df = df[-24:]
+    else:
+        train_df = df
+        test_df = None
+
+    X, y, scaler = preprocess_data(train_df)
     model = build_lstm_model((X.shape[1], X.shape[2]))
-    model = train_model(model, X, y, epochs=50)
+    model = train_model(model, X, y, epochs=args.epochs)
 
     # Use the last seq_len hours to predict the next 24 hours
     last_sequence = X[-1:]
     next_prices = predict_next_hours(model, last_sequence, scaler, n_hours=24)
-    print("Next 24 hour predictions:")
-    for i, price in enumerate(next_prices, start=1):
-        print(f"Hour +{i}: ${price:.4f}")
 
-    # Plot the last 100 actual prices
-    last_100 = df[-100:].copy()
+    if args.compare and test_df is not None:
+        print("Predicted vs Actual for last 24 hours:")
+        for i, (pred, actual) in enumerate(zip(next_prices, test_df['price']), start=1):
+            print(f"Hour +{i}: Predicted ${pred:.4f} - Actual ${actual:.4f}")
+    else:
+        print("Next 24 hour predictions:")
+        for i, price in enumerate(next_prices, start=1):
+            print(f"Hour +{i}: ${price:.4f}")
+
+    # Plot the last 100 hours of data
+    history = train_df if args.compare and test_df is not None else df
+    last_100 = history[-100:].copy()
     ax = last_100['price'].plot(
         title="Blockasset (BLOCK) Price Prediction",
         label="Actual",
     )
 
-    # Plot predicted next 24 hours as a line starting from the last actual point
-    pred_dates = [last_100.index[-1] + pd.Timedelta(hours=i) for i in range(1, 25)]
+    # Plot predicted next 24 hours starting from the end of the training data
+    start_date = train_df.index[-1]
+    pred_dates = [start_date + pd.Timedelta(hours=i) for i in range(1, 25)]
     pred_values = next_prices
     pred_series = pd.Series(
-        [last_100['price'].iloc[-1]] + pred_values.tolist(),
-        index=[last_100.index[-1]] + pred_dates,
+        [train_df['price'].iloc[-1]] + pred_values.tolist(),
+        index=[start_date] + pred_dates,
     )
     pred_series.plot(ax=ax, label="Predicted", color="orange")
+
+    if args.compare and test_df is not None:
+        test_df['price'].plot(ax=ax, label="Actual Next 24h", color="green")
 
     ax.set_xlabel("Date")
     ax.set_ylabel("Price (USD)")
