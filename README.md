@@ -42,3 +42,15 @@ The previous standalone `trade_simulation.py` has been incorporated into
 `block_analysis.py`. When you run the analysis script a short example simulation
 is executed automatically and the monthly balances are printed.
 
+
+## Fetching OHLC Data
+
+Use `fetch_ohlc.py` to download open, high, low and close prices for the
+Blockasset token from CoinGecko.
+
+```bash
+python fetch_ohlc.py
+```
+
+The script fetches the last 30 days of hourly data and prints the first few
+rows to the console.
