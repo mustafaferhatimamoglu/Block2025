@@ -10,6 +10,10 @@ Install the Python dependencies (it's recommended to do this inside a virtual en
 pip install -r requirements.txt
 ```
 
+**Note:** The script is designed to run on the CPU. If your environment
+lacks GPU support, install the `tensorflow-cpu` package to avoid any
+CUDA-related errors.
+
 ## Usage
 
 Run the prediction script:
