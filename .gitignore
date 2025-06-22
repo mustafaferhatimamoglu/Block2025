@@ -195,3 +195,4 @@ cython_debug/
 # Generated files
 block_prices.csv
 prediction.png
+predictions.csv
