@@ -17,7 +17,6 @@ from tensorflow.keras.models import Sequential
 
 # Fetch hourly price data for Blockasset (BLOCK) from CoinGecko
 
-# Fetch hourly price data for Blockasset (BLOCK) from CoinGecko
 
 def fetch_data() -> pd.DataFrame:
     """Fetch hourly price data for Blockasset from the last year."""
