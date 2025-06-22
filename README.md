@@ -1,6 +1,6 @@
 # Block2025
 
-This repository contains a simple script to predict the Blockasset (BLOCK) price using an LSTM neural network. The script fetches historical price data from CoinGecko and trains a model using TensorFlow and scikit-learn.
+This repository contains a simple script to predict the Blockasset (BLOCK) price using an LSTM neural network. The script fetches historical price data from CoinGecko and trains a model using the CPU-only TensorFlow package and scikit-learn.
 
 ## Installation
 
@@ -9,6 +9,7 @@ Install the Python dependencies (it's recommended to do this inside a virtual en
 ```
 pip install -r requirements.txt
 ```
+The requirements file uses `tensorflow-cpu`, which installs TensorFlow without any GPU libraries.
 
 ## Usage
 
