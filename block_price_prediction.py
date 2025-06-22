@@ -114,6 +114,12 @@ if __name__ == "__main__":
         action="store_true",
         help="Display the plot after saving it to disk",
     )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=50,
+        help="Number of training epochs (default: 50)",
+    )
     args = parser.parse_args()
 
     df = fetch_data()
@@ -124,7 +130,7 @@ if __name__ == "__main__":
         print(f"Data start: {df.index[0]}  Data end: {df.index[-1]}")
     X, y, scaler = preprocess_data(df)
     model = build_lstm_model((X.shape[1], X.shape[2]))
-    model = train_model(model, X, y, epochs=50)
+    model = train_model(model, X, y, epochs=args.epochs)
 
     # Use the last seq_len hours to predict the next 24 hours
     last_sequence = X[-1:]
