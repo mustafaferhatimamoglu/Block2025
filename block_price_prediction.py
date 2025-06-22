@@ -7,9 +7,10 @@ import numpy as np
 import pandas as pd
 import requests
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'       # suppress INFO and WARNING logs
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'       # suppress non-critical TensorFlow warnings
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'      # disable GPU detection
 import tensorflow as tf
+tf.config.set_visible_devices([], 'GPU')       # explicitly disable GPU detection
 tf.get_logger().setLevel('ERROR')
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.layers import LSTM, Dense, Input
