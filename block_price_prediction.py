@@ -19,8 +19,22 @@ from tensorflow.keras.models import Sequential
 # Fetch hourly price data for Blockasset (BLOCK) from CoinGecko
 
 
-def fetch_data() -> pd.DataFrame:
-    """Fetch hourly price data for Blockasset from the last year."""
+def fetch_data(cache_file: str = "block_prices.csv") -> pd.DataFrame:
+    """Fetch hourly price data for Blockasset from the last year.
+
+    If a cache file exists and is less than 24 hours old, load data from it
+    instead of making a network request.
+    """
+
+    # Return cached data when available to avoid repeated downloads
+    if os.path.exists(cache_file):
+        try:
+            file_age = time.time() - os.path.getmtime(cache_file)
+            if file_age < 24 * 3600:
+                df = pd.read_csv(cache_file, parse_dates=["date"], index_col="date")
+                return df.sort_index()
+        except Exception as exc:  # fall back to fetching if cache fails
+            print(f"Error loading cached data: {exc}")
 
     end_ts = int(time.time())
     start_ts = end_ts - 365 * 24 * 3600
@@ -54,7 +68,12 @@ def fetch_data() -> pd.DataFrame:
     df.set_index("date", inplace=True)
     df = df[~df.index.duplicated(keep="first")]
     df.drop("timestamp", axis=1, inplace=True)
-    return df.sort_index()
+    df = df.sort_index()
+    try:
+        df.to_csv(cache_file)
+    except Exception as exc:
+        print(f"Error saving cache: {exc}")
+    return df
 
 # Preprocess data: scale prices and create hourly sequences
 

@@ -21,7 +21,11 @@ CUDA-related errors.
 
 Run the prediction script:
 
-The script downloads the latest price data from CoinGecko, trains an LSTM model and prints the predicted prices for the next 24 hours by default. After training a chart window will open showing recent prices along with the prediction.
+The script downloads the latest price data from CoinGecko, trains an LSTM model
+and prints the predicted prices for the next 24 hours by default. The fetched
+prices are cached in `block_prices.csv`; if this file is newer than 24 hours the
+data is loaded from disk instead of downloading again. After training a chart
+window will open showing recent prices along with the prediction.
 
 ```
 python block_price_prediction.py
