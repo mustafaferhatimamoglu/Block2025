@@ -13,6 +13,10 @@ The requirements file uses `tensorflow-cpu`, which installs TensorFlow without a
 
 Note that this project uses the CPU-only TensorFlow package (`tensorflow-cpu`). Installing the GPU variant (`tensorflow`) on a system without CUDA may produce errors.
 
+**Note:** The script is designed to run on the CPU. If your environment
+lacks GPU support, install the `tensorflow-cpu` package to avoid any
+CUDA-related errors.
+
 ## Usage
 
 Run the prediction script:
