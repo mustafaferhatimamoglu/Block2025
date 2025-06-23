@@ -1,44 +1,77 @@
-
 import argparse
 import requests
 import pandas as pd
 import time
 
 
-COIN_ID = "blockasset"
-VS_CURRENCY = "usd"
-DEFAULT_DAYS = 365  # max history allowed by public API
+PAIR = "BLOCK_USDT"
+INTERVAL = "1h"
+DEFAULT_DAYS = 365  # gate.io allows up to 10000 candles (~416 days)
 
 
 def fetch_ohlc(days: int = DEFAULT_DAYS) -> pd.DataFrame:
-    """Download hourly OHLC data for the configured coin."""
+    """Download hourly OHLCV data for the configured pair from gate.io."""
 
-    def fetch_prices(start: int, end: int) -> list:
-        url = f"https://api.coingecko.com/api/v3/coins/{COIN_ID}/market_chart/range"
-        params = {"vs_currency": VS_CURRENCY, "from": start, "to": end}
+    def fetch_chunk(start: int) -> list:
+        url = "https://api.gateio.ws/api/v4/spot/candlesticks"
+        params = {
+            "currency_pair": PAIR,
+            "interval": INTERVAL,
+            "limit": 1000,
+            "from": start,
+        }
         resp = requests.get(url, params=params, timeout=10)
         resp.raise_for_status()
-        return resp.json()["prices"]
+        return resp.json()
 
     now = int(time.time())
     start = now - days * 86400
-    all_prices = []
+    all_rows: list[list[str]] = []
     while start < now:
-        end = min(start + 90 * 86400, now)
-        all_prices.extend(fetch_prices(start, end))
-        start = end
+        chunk = fetch_chunk(start)
+        if not chunk:
+            break
+        all_rows.extend(chunk)
+        last_ts = int(chunk[-1][0])
+        start = last_ts + 3600
+        time.sleep(0.2)
 
-    df = pd.DataFrame(all_prices, columns=["timestamp", "price"])
-    df["date"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True)
+    columns = [
+        "timestamp",
+        "quote_volume",
+        "close",
+        "high",
+        "low",
+        "open",
+        "volume",
+        "complete",
+    ]
+    df = pd.DataFrame(all_rows, columns=columns)
+    df["timestamp"] = pd.to_numeric(df["timestamp"])
+    df[["open", "high", "low", "close", "volume", "quote_volume"]] = df[
+        ["open", "high", "low", "close", "volume", "quote_volume"]
+    ].astype(float)
+    df["date"] = pd.to_datetime(df["timestamp"], unit="s", utc=True)
     df.set_index("date", inplace=True)
+    df.sort_index(inplace=True)
     df = df[~df.index.duplicated(keep="first")]
-    ohlc = df["price"].resample("1H").ohlc()
-    return ohlc
+    return df[
+        [
+            "timestamp",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "quote_volume",
+            "complete",
+        ]
+    ]
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Fetch OHLC data for Blockasset and save to CSV"
+        description="Fetch hourly OHLCV data from gate.io and save to CSV"
     )
     parser.add_argument(
         "--outfile",
