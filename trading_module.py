@@ -9,8 +9,15 @@ from sklearn.model_selection import train_test_split
 import joblib
 
 
-def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    """Add common technical indicators to the dataframe."""
+def load_csv(path: str = "ohlc.csv") -> pd.DataFrame:
+    """Read OHLCV data from a CSV file."""
+    df = pd.read_csv(path, parse_dates=["date"], index_col="date")
+    df.sort_index(inplace=True)
+    return df
+
+
+def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
+    """Add RSI, EMA, MACD and Bollinger Bands columns."""
     df = df.copy()
     df["rsi"] = RSIIndicator(df["close"], window=14).rsi()
     macd = MACD(close=df["close"], window_slow=26, window_fast=12, window_sign=9)
@@ -26,19 +33,25 @@ def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def label_data(df: pd.DataFrame, horizon: int = 24) -> pd.DataFrame:
-    """Label data as 1 (BUY) if future price is higher, else 0 (SELL)."""
+def label_data(
+    df: pd.DataFrame, horizon: int = 4, threshold: float = 0.02
+) -> pd.DataFrame:
+    """Label rows as BUY (1) if price rises ``threshold`` in ``horizon`` hours."""
     df = df.copy()
-    df["future_close"] = df["close"].shift(-horizon)
-    df["target"] = np.where(df["future_close"] > df["close"], 1, 0)
+    future = df["close"].shift(-horizon)
+    pct_change = future / df["close"] - 1.0
+    df["target"] = (pct_change >= threshold).astype(int)
     df.dropna(inplace=True)
     return df
 
 
 def create_sequences(
-    df: pd.DataFrame, features: List[str], lookback: int = 48, horizon: int = 24
+    df: pd.DataFrame,
+    features: List[str],
+    lookback: int = 48,
+    horizon: int = 4,
 ) -> Tuple[np.ndarray, np.ndarray, List[pd.Timestamp]]:
-    """Create feature/label sequences for model training."""
+    """Return sliding window sequences and labels."""
     sequences: List[np.ndarray] = []
     targets: List[int] = []
     indices: List[pd.Timestamp] = []
@@ -49,6 +62,33 @@ def create_sequences(
         targets.append(label)
         indices.append(df.index[i])
     return np.array(sequences), np.array(targets), indices
+
+
+def create_dataset(
+    df: pd.DataFrame,
+    days: int = 30,
+    lookback: int = 48,
+    horizon: int = 4,
+    threshold: float = 0.02,
+) -> Tuple[np.ndarray, np.ndarray, List[pd.Timestamp], List[str]]:
+    """Prepare model input/output arrays from the last ``days`` of data."""
+    df = df.tail(days * 24 + lookback + horizon)
+    df = add_indicators(df)
+    df = label_data(df, horizon=horizon, threshold=threshold)
+    feature_cols = [
+        "close",
+        "volume",
+        "rsi",
+        "ema_20",
+        "macd",
+        "macd_signal",
+        "macd_diff",
+        "bb_mavg",
+        "bb_high",
+        "bb_low",
+    ]
+    X, y, idx = create_sequences(df, feature_cols, lookback, horizon)
+    return X, y, idx, feature_cols
 
 
 def train_model(X: np.ndarray, y: np.ndarray) -> RandomForestClassifier:
@@ -80,10 +120,11 @@ def simulate_trading(
     model: RandomForestClassifier,
     features: List[str],
     lookback: int = 48,
-    horizon: int = 24,
+    horizon: int = 4,
     initial_balance: float = 1000.0,
+    fee: float = 0.002,
 ) -> Tuple[float, List[dict]]:
-    """Simulate trading based on model predictions."""
+    """Simulate simple trading and return final balance and trade log."""
     balance = initial_balance
     holdings = 0.0
     trades: List[dict] = []
@@ -91,21 +132,36 @@ def simulate_trading(
     preds = predict(model, X)
     closes = df["close"].iloc[lookback : len(df) - horizon + 1]
     for ts, pred, price in zip(indices, preds, closes):
-        if pred == 1 and balance > 0:  # BUY
-            qty = balance / price
+        if pred == 1 and balance > 0:
+            qty = (balance * (1 - fee)) / price
             holdings += qty
-            balance = 0.0
             trades.append({"time": ts, "type": "BUY", "price": price, "qty": qty})
-        elif pred == 0 and holdings > 0:  # SELL
-            balance += holdings * price
+            balance = 0.0
+        elif pred == 0 and holdings > 0:
+            proceeds = holdings * price * (1 - fee)
+            balance += proceeds
             trades.append({"time": ts, "type": "SELL", "price": price, "qty": holdings})
             holdings = 0.0
-    # liquidate remaining holdings at final price
     if holdings > 0:
         final_price = df["close"].iloc[-1]
-        balance += holdings * final_price
+        proceeds = holdings * final_price * (1 - fee)
+        balance += proceeds
         trades.append({"time": df.index[-1], "type": "SELL", "price": final_price, "qty": holdings})
         holdings = 0.0
     return balance, trades
+
+
+def main() -> None:
+    df = load_csv()
+    X, y, idx, features = create_dataset(df)
+    model = train_model(X, y)
+    final_balance, trades = simulate_trading(df, model, features)
+    for t in trades:
+        print(f"{t['time']}: {t['type']} {t['qty']:.4f} at {t['price']:.4f}")
+    print(f"\nFinal balance: {final_balance:.2f} USDT")
+
+
+if __name__ == "__main__":
+    main()
 
 
