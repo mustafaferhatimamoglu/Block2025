@@ -4,12 +4,12 @@ This repository contains a simple script to predict the Blockasset (BLOCK) price
 
 ## Installation
 
-Install the Python dependencies (it's recommended to do this inside a virtual environment). The requirements use the CPU-only TensorFlow build, which avoids CUDA-related errors:
+Install the Python dependencies (it's recommended to do this inside a virtual environment). The requirements use the CPU-only TensorFlow build, which avoids CUDA-related errors. A new dependency, `joblib`, is included for saving and loading models:
 
 ```
 pip install -r requirements.txt
 ```
-The requirements file uses `tensorflow-cpu`, which installs TensorFlow without any GPU libraries.
+The requirements file uses `tensorflow-cpu`, which installs TensorFlow without any GPU libraries, and also lists `joblib` for saving and loading models.
 
 Note that this project uses the CPU-only TensorFlow package (`tensorflow-cpu`). Installing the GPU variant (`tensorflow`) on a system without CUDA may produce errors.
 
