@@ -24,8 +24,10 @@ Run the prediction script:
 The script downloads the latest price data from CoinGecko, trains an LSTM model
 and prints the predicted prices for the next 24 hours by default. The fetched
 prices are cached in `block_prices.csv`; if this file is newer than 24 hours the
-data is loaded from disk instead of downloading again. After training a chart
-window will open showing recent prices along with the prediction.
+data is loaded from disk instead of downloading again. Should the API respond
+with "Too Many Requests" errors, the fetcher now retries automatically using a
+simple exponential backoff. After training a chart window will open showing
+recent prices along with the prediction.
 
 ```bash
 python block_analysis.py

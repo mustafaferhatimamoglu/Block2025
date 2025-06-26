@@ -60,19 +60,37 @@ class DataFetcher:
         cur = start_ts
         headers = {"accept": "application/json"}
 
+        max_retries = 5
+
         while cur < end_ts:
             params = {
                 "vs_currency": "usd",
                 "from": cur,
                 "to": min(cur + step, end_ts),
             }
-            resp = requests.get(url, params=params, headers=headers, timeout=10)
-            resp.raise_for_status()
+            retries = 0
+            while True:
+                resp = requests.get(url, params=params, headers=headers, timeout=10)
+                if resp.status_code == 429 and retries < max_retries:
+                    wait = int(resp.headers.get("Retry-After", 2)) * (retries + 1)
+                    time.sleep(wait)
+                    retries += 1
+                    continue
+                try:
+                    resp.raise_for_status()
+                except requests.HTTPError:
+                    if retries < max_retries:
+                        time.sleep(2 ** retries)
+                        retries += 1
+                        continue
+                    raise
+                break
+
             data = resp.json()
             prices = data.get("prices", [])
             all_prices.extend(prices)
             cur += step
-            time.sleep(1)
+            time.sleep(2)
 
         df = pd.DataFrame(all_prices, columns=["timestamp", "price"])
         df["date"] = pd.to_datetime(df["timestamp"], unit="ms")
