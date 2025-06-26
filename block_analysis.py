@@ -18,6 +18,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import requests
+
+from request_utils import get_with_retry
 import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.layers import LSTM, Dense, Input
@@ -58,7 +60,9 @@ class DataFetcher:
         if os.path.exists(self.cache_file):
             file_age = time.time() - os.path.getmtime(self.cache_file)
             if file_age < 24 * 3600:
-                df = pd.read_csv(self.cache_file, parse_dates=["date"], index_col="date")
+                df = pd.read_csv(
+                    self.cache_file, parse_dates=["date"], index_col="date"
+                )
                 return df.sort_index()
 
         end_ts = int(time.time())
@@ -123,7 +127,9 @@ class IndicatorCalculator:
         df["Price_Change"] = df["price"].pct_change()
         df["RSI"] = self._rsi(df["price"], period=14)
         df["MACD"] = self._macd(df["price"])
-        df["Bollinger_Upper"], df["Bollinger_Lower"] = self._bollinger(df["price"], window=20)
+        df["Bollinger_Upper"], df["Bollinger_Lower"] = self._bollinger(
+            df["price"], window=20
+        )
         return df.dropna()
 
     @staticmethod
@@ -155,7 +161,9 @@ class IndicatorCalculator:
 class LSTMModel:
     """Handles preprocessing, training and predicting with an LSTM model."""
 
-    def __init__(self, df: pd.DataFrame, seq_len: int = SEQ_LEN, epochs: int = EPOCHS) -> None:
+    def __init__(
+        self, df: pd.DataFrame, seq_len: int = SEQ_LEN, epochs: int = EPOCHS
+    ) -> None:
         self.df = df
         self.seq_len = seq_len
         self.epochs = epochs
@@ -208,7 +216,9 @@ class SimulationResult:
 class TradeSimulator:
     """Simple monthly trade simulation applying commissions."""
 
-    def __init__(self, initial_balance: float = 100.0, commission: float = 0.002) -> None:
+    def __init__(
+        self, initial_balance: float = 100.0, commission: float = 0.002
+    ) -> None:
         self.initial_balance = initial_balance
         self.commission = commission
 
@@ -327,14 +337,113 @@ class LSTMTrader:
         return balance
 
 
-def plot_predictions(df: pd.DataFrame, predictions: pd.Series, outfile: str = "prediction.png") -> None:
+class LSTMTrader:
+    """Backtest a naive strategy using LSTM price predictions.
+
+    This example is provided for informational and educational purposes only and
+    does not constitute financial advice.
+    """
+
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        seq_len: int = SEQ_LEN,
+        train_size: int = 300,
+        epochs: int = EPOCHS,
+        initial_balance: float = 1000.0,
+        commission: float = 0.002,
+    ) -> None:
+        self.df = df
+        self.seq_len = seq_len
+        self.train_size = train_size
+        self.epochs = epochs
+        self.initial_balance = initial_balance
+        self.commission = commission
+        self.scaler = MinMaxScaler(feature_range=(0, 1))
+        self.model = self._build_model((seq_len, 1))
+        self.trades: List[dict] = []
+
+    def _build_model(self, input_shape) -> Sequential:
+        model = Sequential(
+            [Input(shape=input_shape), LSTM(50, activation="relu"), Dense(1)]
+        )
+        model.compile(optimizer="adam", loss="mse")
+        return model
+
+    def _prepare_data(self) -> np.ndarray:
+        return self.scaler.fit_transform(self.df[["price"]])
+
+    def backtest(self) -> float:
+        scaled = self._prepare_data()
+
+        X_train, y_train = [], []
+        for i in range(self.train_size - self.seq_len):
+            X_train.append(scaled[i : i + self.seq_len])
+            y_train.append(scaled[i + self.seq_len])
+        self.model.fit(
+            np.array(X_train), np.array(y_train), epochs=self.epochs, verbose=0
+        )
+
+        balance = self.initial_balance
+        holdings = 0.0
+        for i in range(self.train_size, len(self.df) - 1):
+            seq = scaled[i - self.seq_len : i]
+            pred_scaled = self.model.predict(seq[np.newaxis, :, :], verbose=0)[0, 0]
+            pred = self.scaler.inverse_transform([[pred_scaled]])[0, 0]
+            price = self.df["price"].iloc[i]
+
+            if pred > price and balance > 0:
+                qty = balance / price
+                balance -= qty * price * (1 + self.commission)
+                holdings += qty
+                self.trades.append(
+                    {
+                        "time": self.df.index[i],
+                        "type": "BUY",
+                        "price": price,
+                        "qty": qty,
+                    }
+                )
+            elif pred < price and holdings > 0:
+                balance += holdings * price * (1 - self.commission)
+                self.trades.append(
+                    {
+                        "time": self.df.index[i],
+                        "type": "SELL",
+                        "price": price,
+                        "qty": holdings,
+                    }
+                )
+                holdings = 0.0
+
+        if holdings > 0:
+            final_price = self.df["price"].iloc[-1]
+            balance += holdings * final_price * (1 - self.commission)
+            self.trades.append(
+                {
+                    "time": self.df.index[-1],
+                    "type": "SELL",
+                    "price": final_price,
+                    "qty": holdings,
+                }
+            )
+        return balance
+
+
+def plot_predictions(
+    df: pd.DataFrame, predictions: pd.Series, outfile: str = "prediction.png"
+) -> None:
     """Plot actual prices and predicted future prices."""
     last_100 = df[-100:]
-    ax = last_100["price"].plot(title="Blockasset (BLOCK) Price Prediction", label="Actual")
-    pred_series = pd.concat([
-        pd.Series({last_100.index[-1]: last_100["price"].iloc[-1]}),
-        predictions,
-    ])
+    ax = last_100["price"].plot(
+        title="Blockasset (BLOCK) Price Prediction", label="Actual"
+    )
+    pred_series = pd.concat(
+        [
+            pd.Series({last_100.index[-1]: last_100["price"].iloc[-1]}),
+            predictions,
+        ]
+    )
     pred_series.plot(ax=ax, label="Predicted", color="orange")
     ax.set_xlabel("Date")
     ax.set_ylabel("Price (USD)")
@@ -421,6 +530,7 @@ def main() -> None:
         for t in trader.trades[:3]:
             print(f"{t['time']:%Y-%m-%d %H:%M} {t['type']} at ${t['price']:.4f} qty {t['qty']:.4f}")
         plot_trades(raw_df, trader.trades)
+
 
 
 if __name__ == "__main__":

@@ -5,3 +5,4 @@ scikit-learn
 tensorflow-cpu
 matplotlib
 ta
+joblib
