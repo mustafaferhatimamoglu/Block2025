@@ -24,11 +24,21 @@ Run the prediction script:
 The script downloads the latest price data from CoinGecko, trains an LSTM model
 and prints the predicted prices for the next 24 hours by default. The fetched
 prices are cached in `block_prices.csv`; if this file is newer than 24 hours the
-data is loaded from disk instead of downloading again. After training a chart
-window will open showing recent prices along with the prediction.
+data is loaded from disk instead of downloading again. Should the API respond
+with "Too Many Requests" errors, the fetcher now retries automatically using a
+simple exponential backoff. After training a chart window will open showing
+recent prices along with the prediction.
 
 ```bash
 python block_analysis.py
+```
+
+You can also run the analysis on your own Gate.io CSV export using the
+`--csv` option. The loader expects a column named `close`, which will be
+treated as the price.
+
+```bash
+python block_analysis.py --csv my_data.csv
 ```
 
 The script computes several technical indicators, trains an LSTM model and
@@ -41,6 +51,24 @@ printed to the console.
 The previous standalone `trade_simulation.py` has been incorporated into
 `block_analysis.py`. When you run the analysis script a short example simulation
 is executed automatically and the monthly balances are printed.
+
+The `TradeSimulator` also provides a `run_daily()` method that spreads the
+monthly returns over each day and returns a list of daily balances. In the
+example script the first few daily results are printed after the monthly
+summary.
+
+## LSTM Trading Example
+
+`block_analysis.py` also demonstrates an experimental `LSTMTrader` that trains
+on historical prices and performs a very naive backtest. After the monthly
+simulation finishes, the script runs the trader and prints the final balance and
+some sample trades.
+
+## Disclaimer
+
+The trading examples in this repository are for informational and educational
+purposes only. They do not constitute financial advice. Use any strategy at your
+own risk.
 
 
 ## Fetching OHLC Data
@@ -58,3 +86,9 @@ python fetch_ohlc.py --outfile my_data.csv --days 120
 
 The script prints the first few rows of data and reports how many entries
 were written to the file.
+
+Once you have a CSV file you can run the main analysis script with:
+
+```bash
+python block_analysis.py --csv my_data.csv
+```
