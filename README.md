@@ -63,8 +63,9 @@ summary.
 `block_analysis.py` also demonstrates an experimental `LSTMTrader` that trains
 on historical prices and performs a very naive backtest. After the monthly
 simulation finishes, the script runs the trader and prints the final balance and
-some sample trades. A chart of these buy and sell points is saved to
-`trades.png` for quick inspection.
+some sample trades. Charts of the trades and account balance are saved to
+`trades.png` and `balance.png` for quick inspection. The model now trains for
+20 epochs by default which can yield slightly more stable results.
 
 ## Disclaimer
 
