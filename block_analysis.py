@@ -12,6 +12,7 @@ import os
 import time
 from dataclasses import dataclass
 from typing import List
+import argparse
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -41,13 +42,21 @@ SEQ_LEN = 24
 
 
 class DataFetcher:
-    """Fetches historical price data for Blockasset from CoinGecko."""
+    """Fetches historical price data for Blockasset from CoinGecko or a local file."""
 
-    def __init__(self, cache_file: str = CACHE_FILE) -> None:
+    def __init__(self, cache_file: str = CACHE_FILE, local_csv: str | None = None) -> None:
         self.cache_file = cache_file
+        self.local_csv = local_csv
 
     def fetch(self) -> pd.DataFrame:
         """Return a DataFrame with hourly prices."""
+        if self.local_csv:
+            df = pd.read_csv(self.local_csv, parse_dates=["date"])
+            if "close" in df.columns and "price" not in df.columns:
+                df.rename(columns={"close": "price"}, inplace=True)
+            df.set_index("date", inplace=True)
+            return df.sort_index()
+
         if os.path.exists(self.cache_file):
             file_age = time.time() - os.path.getmtime(self.cache_file)
             if file_age < 24 * 3600:
@@ -64,22 +73,37 @@ class DataFetcher:
         cur = start_ts
         headers = {"accept": "application/json"}
 
+        max_retries = 5
+
         while cur < end_ts:
             params = {
                 "vs_currency": "usd",
                 "from": cur,
                 "to": min(cur + step, end_ts),
             }
-            try:
-                resp = get_with_retry(url, params=params, headers=headers, timeout=10)
-            except requests.RequestException as exc:
-                print(f"Error fetching data from CoinGecko: {exc}")
+            retries = 0
+            while True:
+                resp = requests.get(url, params=params, headers=headers, timeout=10)
+                if resp.status_code == 429 and retries < max_retries:
+                    wait = int(resp.headers.get("Retry-After", 2)) * (retries + 1)
+                    time.sleep(wait)
+                    retries += 1
+                    continue
+                try:
+                    resp.raise_for_status()
+                except requests.HTTPError:
+                    if retries < max_retries:
+                        time.sleep(2 ** retries)
+                        retries += 1
+                        continue
+                    raise
                 break
+
             data = resp.json()
             prices = data.get("prices", [])
             all_prices.extend(prices)
             cur += step
-            time.sleep(1)
+            time.sleep(2)
 
         df = pd.DataFrame(all_prices, columns=["timestamp", "price"])
         df["date"] = pd.to_datetime(df["timestamp"], unit="ms")
@@ -286,6 +310,76 @@ class LSTMTrader:
         for i in range(self.train_size - self.seq_len):
             X_train.append(scaled[i : i + self.seq_len])
             y_train.append(scaled[i + self.seq_len])
+        self.model.fit(np.array(X_train), np.array(y_train), epochs=self.epochs, verbose=0)
+
+        balance = self.initial_balance
+        holdings = 0.0
+        for i in range(self.train_size, len(self.df) - 1):
+            seq = scaled[i - self.seq_len : i]
+            pred_scaled = self.model.predict(seq[np.newaxis, :, :], verbose=0)[0, 0]
+            pred = self.scaler.inverse_transform([[pred_scaled]])[0, 0]
+            price = self.df["price"].iloc[i]
+
+            if pred > price and balance > 0:
+                qty = balance / price
+                balance -= qty * price * (1 + self.commission)
+                holdings += qty
+                self.trades.append({"time": self.df.index[i], "type": "BUY", "price": price, "qty": qty})
+            elif pred < price and holdings > 0:
+                balance += holdings * price * (1 - self.commission)
+                self.trades.append({"time": self.df.index[i], "type": "SELL", "price": price, "qty": holdings})
+                holdings = 0.0
+
+        if holdings > 0:
+            final_price = self.df["price"].iloc[-1]
+            balance += holdings * final_price * (1 - self.commission)
+            self.trades.append({"time": self.df.index[-1], "type": "SELL", "price": final_price, "qty": holdings})
+        return balance
+
+
+class LSTMTrader:
+    """Backtest a naive strategy using LSTM price predictions.
+
+    This example is provided for informational and educational purposes only and
+    does not constitute financial advice.
+    """
+
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        seq_len: int = SEQ_LEN,
+        train_size: int = 300,
+        epochs: int = EPOCHS,
+        initial_balance: float = 1000.0,
+        commission: float = 0.002,
+    ) -> None:
+        self.df = df
+        self.seq_len = seq_len
+        self.train_size = train_size
+        self.epochs = epochs
+        self.initial_balance = initial_balance
+        self.commission = commission
+        self.scaler = MinMaxScaler(feature_range=(0, 1))
+        self.model = self._build_model((seq_len, 1))
+        self.trades: List[dict] = []
+
+    def _build_model(self, input_shape) -> Sequential:
+        model = Sequential(
+            [Input(shape=input_shape), LSTM(50, activation="relu"), Dense(1)]
+        )
+        model.compile(optimizer="adam", loss="mse")
+        return model
+
+    def _prepare_data(self) -> np.ndarray:
+        return self.scaler.fit_transform(self.df[["price"]])
+
+    def backtest(self) -> float:
+        scaled = self._prepare_data()
+
+        X_train, y_train = [], []
+        for i in range(self.train_size - self.seq_len):
+            X_train.append(scaled[i : i + self.seq_len])
+            y_train.append(scaled[i + self.seq_len])
         self.model.fit(
             np.array(X_train), np.array(y_train), epochs=self.epochs, verbose=0
         )
@@ -358,8 +452,50 @@ def plot_predictions(
     plt.savefig(outfile)
 
 
+def plot_trades(
+    df: pd.DataFrame, trades: List[dict], outfile: str = "trades.png"
+) -> None:
+    """Plot buy/sell trades overlaid on the price chart."""
+    if not trades:
+        return
+
+    ax = df["price"].plot(title="LSTM Trader Backtest", figsize=(10, 5))
+    buys = [t for t in trades if t["type"] == "BUY"]
+    sells = [t for t in trades if t["type"] == "SELL"]
+
+    if buys:
+        ax.scatter(
+            [t["time"] for t in buys],
+            [t["price"] for t in buys],
+            color="green",
+            marker="^",
+            label="BUY",
+        )
+
+    if sells:
+        ax.scatter(
+            [t["time"] for t in sells],
+            [t["price"] for t in sells],
+            color="red",
+            marker="v",
+            label="SELL",
+        )
+
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Price (USD)")
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig(outfile)
+
+
 def main() -> None:
-    fetcher = DataFetcher()
+    parser = argparse.ArgumentParser(description="Blockasset price prediction")
+    parser.add_argument(
+        "--csv", help="Use local CSV file instead of downloading from CoinGecko"
+    )
+    args = parser.parse_args()
+
+    fetcher = DataFetcher(local_csv=args.csv)
     raw_df = fetcher.fetch()
     print(f"Training data starts at {raw_df.index[0]:%Y-%m-%d %H:%M:%S}")
 
@@ -392,9 +528,9 @@ def main() -> None:
     if trader.trades:
         print("First 3 trades:")
         for t in trader.trades[:3]:
-            print(
-                f"{t['time']:%Y-%m-%d %H:%M} {t['type']} at ${t['price']:.4f} qty {t['qty']:.4f}"
-            )
+            print(f"{t['time']:%Y-%m-%d %H:%M} {t['type']} at ${t['price']:.4f} qty {t['qty']:.4f}")
+        plot_trades(raw_df, trader.trades)
+
 
 
 if __name__ == "__main__":
