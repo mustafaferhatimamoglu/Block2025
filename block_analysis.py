@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 import time
 from dataclasses import dataclass
-from typing import List
+from typing import List, Tuple
 import argparse
 
 import matplotlib.pyplot as plt
@@ -37,7 +37,8 @@ df_logger.setLevel("ERROR")
 CACHE_FILE = "block_prices.csv"
 PREDICTION_HOURS = 24
 # Fewer epochs keep example execution snappy
-EPOCHS = 5
+# Increase epochs slightly so the trader model has a bit more time to learn
+EPOCHS = 20
 SEQ_LEN = 24
 
 
@@ -292,76 +293,7 @@ class LSTMTrader:
         self.scaler = MinMaxScaler(feature_range=(0, 1))
         self.model = self._build_model((seq_len, 1))
         self.trades: List[dict] = []
-
-    def _build_model(self, input_shape) -> Sequential:
-        model = Sequential(
-            [Input(shape=input_shape), LSTM(50, activation="relu"), Dense(1)]
-        )
-        model.compile(optimizer="adam", loss="mse")
-        return model
-
-    def _prepare_data(self) -> np.ndarray:
-        return self.scaler.fit_transform(self.df[["price"]])
-
-    def backtest(self) -> float:
-        scaled = self._prepare_data()
-
-        X_train, y_train = [], []
-        for i in range(self.train_size - self.seq_len):
-            X_train.append(scaled[i : i + self.seq_len])
-            y_train.append(scaled[i + self.seq_len])
-        self.model.fit(np.array(X_train), np.array(y_train), epochs=self.epochs, verbose=0)
-
-        balance = self.initial_balance
-        holdings = 0.0
-        for i in range(self.train_size, len(self.df) - 1):
-            seq = scaled[i - self.seq_len : i]
-            pred_scaled = self.model.predict(seq[np.newaxis, :, :], verbose=0)[0, 0]
-            pred = self.scaler.inverse_transform([[pred_scaled]])[0, 0]
-            price = self.df["price"].iloc[i]
-
-            if pred > price and balance > 0:
-                qty = balance / price
-                balance -= qty * price * (1 + self.commission)
-                holdings += qty
-                self.trades.append({"time": self.df.index[i], "type": "BUY", "price": price, "qty": qty})
-            elif pred < price and holdings > 0:
-                balance += holdings * price * (1 - self.commission)
-                self.trades.append({"time": self.df.index[i], "type": "SELL", "price": price, "qty": holdings})
-                holdings = 0.0
-
-        if holdings > 0:
-            final_price = self.df["price"].iloc[-1]
-            balance += holdings * final_price * (1 - self.commission)
-            self.trades.append({"time": self.df.index[-1], "type": "SELL", "price": final_price, "qty": holdings})
-        return balance
-
-
-class LSTMTrader:
-    """Backtest a naive strategy using LSTM price predictions.
-
-    This example is provided for informational and educational purposes only and
-    does not constitute financial advice.
-    """
-
-    def __init__(
-        self,
-        df: pd.DataFrame,
-        seq_len: int = SEQ_LEN,
-        train_size: int = 300,
-        epochs: int = EPOCHS,
-        initial_balance: float = 1000.0,
-        commission: float = 0.002,
-    ) -> None:
-        self.df = df
-        self.seq_len = seq_len
-        self.train_size = train_size
-        self.epochs = epochs
-        self.initial_balance = initial_balance
-        self.commission = commission
-        self.scaler = MinMaxScaler(feature_range=(0, 1))
-        self.model = self._build_model((seq_len, 1))
-        self.trades: List[dict] = []
+        self.balance_history: List[Tuple[pd.Timestamp, float]] = []
 
     def _build_model(self, input_shape) -> Sequential:
         model = Sequential(
@@ -386,6 +318,7 @@ class LSTMTrader:
 
         balance = self.initial_balance
         holdings = 0.0
+        self.balance_history = []
         for i in range(self.train_size, len(self.df) - 1):
             seq = scaled[i - self.seq_len : i]
             pred_scaled = self.model.predict(seq[np.newaxis, :, :], verbose=0)[0, 0]
@@ -416,6 +349,9 @@ class LSTMTrader:
                 )
                 holdings = 0.0
 
+            account_value = balance + holdings * price
+            self.balance_history.append((self.df.index[i], account_value))
+
         if holdings > 0:
             final_price = self.df["price"].iloc[-1]
             balance += holdings * final_price * (1 - self.commission)
@@ -427,7 +363,21 @@ class LSTMTrader:
                     "qty": holdings,
                 }
             )
+            self.balance_history.append((self.df.index[-1], balance))
         return balance
+
+    def plot_balance(self, outfile: str = "balance.png") -> None:
+        """Plot account balance over time."""
+        if not self.balance_history:
+            return
+        times, balances = zip(*self.balance_history)
+        plt.figure(figsize=(10, 5))
+        plt.plot(times, balances, label="Balance")
+        plt.xlabel("Date")
+        plt.ylabel("USD")
+        plt.title("LSTM Trader Balance")
+        plt.tight_layout()
+        plt.savefig(outfile)
 
 
 def plot_predictions(
@@ -530,6 +480,7 @@ def main() -> None:
         for t in trader.trades[:3]:
             print(f"{t['time']:%Y-%m-%d %H:%M} {t['type']} at ${t['price']:.4f} qty {t['qty']:.4f}")
         plot_trades(raw_df, trader.trades)
+    trader.plot_balance()
 
 
 
