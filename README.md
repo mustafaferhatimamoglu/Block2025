@@ -42,6 +42,24 @@ The previous standalone `trade_simulation.py` has been incorporated into
 `block_analysis.py`. When you run the analysis script a short example simulation
 is executed automatically and the monthly balances are printed.
 
+The `TradeSimulator` also provides a `run_daily()` method that spreads the
+monthly returns over each day and returns a list of daily balances. In the
+example script the first few daily results are printed after the monthly
+summary.
+
+## LSTM Trading Example
+
+`block_analysis.py` also demonstrates an experimental `LSTMTrader` that trains
+on historical prices and performs a very naive backtest. After the monthly
+simulation finishes, the script runs the trader and prints the final balance and
+some sample trades.
+
+## Disclaimer
+
+The trading examples in this repository are for informational and educational
+purposes only. They do not constitute financial advice. Use any strategy at your
+own risk.
+
 
 ## Fetching OHLC Data
 
