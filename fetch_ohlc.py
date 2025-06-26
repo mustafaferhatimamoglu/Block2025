@@ -1,5 +1,7 @@
 import argparse
 import requests
+
+from request_utils import get_with_retry
 import pandas as pd
 import time
 
@@ -20,8 +22,11 @@ def fetch_ohlc(days: int = DEFAULT_DAYS) -> pd.DataFrame:
             "limit": 1000,
             "from": start,
         }
-        resp = requests.get(url, params=params, timeout=10)
-        resp.raise_for_status()
+        try:
+            resp = get_with_retry(url, params=params, timeout=10)
+        except requests.RequestException as exc:
+            print(f"Error fetching OHLC data: {exc}")
+            return []
         return resp.json()
 
     now = int(time.time())

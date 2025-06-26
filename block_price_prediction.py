@@ -6,12 +6,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import requests
+
+from request_utils import get_with_retry
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'       # suppress INFO, WARNING, and ERROR logs
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'      # disable GPU detection
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # suppress INFO, WARNING, and ERROR logs
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # disable GPU detection
 import tensorflow as tf
-tf.config.set_visible_devices([], 'GPU')       # explicitly disable GPU detection
-tf.get_logger().setLevel('ERROR')
+
+tf.config.set_visible_devices([], "GPU")  # explicitly disable GPU detection
+tf.get_logger().setLevel("ERROR")
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.layers import LSTM, Dense, Input
 from tensorflow.keras.models import Sequential
@@ -52,8 +56,7 @@ def fetch_data(cache_file: str = "block_prices.csv") -> pd.DataFrame:
             "to": min(cur + step, end_ts),
         }
         try:
-            resp = requests.get(url, params=params, headers=headers, timeout=10)
-            resp.raise_for_status()
+            resp = get_with_retry(url, params=params, headers=headers, timeout=10)
         except requests.RequestException as exc:
             print(f"Error fetching data from CoinGecko: {exc}")
             break
@@ -75,20 +78,22 @@ def fetch_data(cache_file: str = "block_prices.csv") -> pd.DataFrame:
         print(f"Error saving cache: {exc}")
     return df
 
+
 # Preprocess data: scale prices and create hourly sequences
 
 
 def preprocess_data(df, seq_len=24):
     scaler = MinMaxScaler(feature_range=(0, 1))
-    scaled = scaler.fit_transform(df[['price']])
+    scaled = scaler.fit_transform(df[["price"]])
     sequences = []
     targets = []
     for i in range(len(scaled) - seq_len):
-        sequences.append(scaled[i:i + seq_len])
+        sequences.append(scaled[i : i + seq_len])
         targets.append(scaled[i + seq_len])
     X = np.array(sequences)
     y = np.array(targets)
     return X, y, scaler
+
 
 # Build a simple LSTM model
 
@@ -97,10 +102,11 @@ def build_lstm_model(input_shape):
     """Build a simple LSTM model without the Keras input shape warning."""
     model = Sequential()
     model.add(Input(shape=input_shape))
-    model.add(LSTM(50, activation='relu'))
+    model.add(LSTM(50, activation="relu"))
     model.add(Dense(1))
-    model.compile(optimizer='adam', loss='mse')
+    model.compile(optimizer="adam", loss="mse")
     return model
+
 
 # Train the LSTM model
 
@@ -108,6 +114,7 @@ def build_lstm_model(input_shape):
 def train_model(model, X_train, y_train, epochs=50):
     model.fit(X_train, y_train, epochs=epochs, verbose=0)
     return model
+
 
 # Predict the next n hours using the last sequence
 
@@ -166,16 +173,18 @@ if __name__ == "__main__":
 
     # Plot the last 100 actual prices
     last_100 = df[-100:].copy()
-    ax = last_100['price'].plot(
+    ax = last_100["price"].plot(
         title="Blockasset (BLOCK) Price Prediction",
         label="Actual",
     )
 
     # Plot predicted next hours as a line starting from the last actual point
-    pred_dates = [last_100.index[-1] + pd.Timedelta(hours=i) for i in range(1, args.hours + 1)]
+    pred_dates = [
+        last_100.index[-1] + pd.Timedelta(hours=i) for i in range(1, args.hours + 1)
+    ]
     pred_values = next_prices
     pred_series = pd.Series(
-        [last_100['price'].iloc[-1]] + pred_values.tolist(),
+        [last_100["price"].iloc[-1]] + pred_values.tolist(),
         index=[last_100.index[-1]] + pred_dates,
     )
     pred_series.plot(ax=ax, label="Predicted", color="orange")
