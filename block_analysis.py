@@ -343,6 +343,42 @@ def plot_predictions(df: pd.DataFrame, predictions: pd.Series, outfile: str = "p
     plt.savefig(outfile)
 
 
+def plot_trades(
+    df: pd.DataFrame, trades: List[dict], outfile: str = "trades.png"
+) -> None:
+    """Plot buy/sell trades overlaid on the price chart."""
+    if not trades:
+        return
+
+    ax = df["price"].plot(title="LSTM Trader Backtest", figsize=(10, 5))
+    buys = [t for t in trades if t["type"] == "BUY"]
+    sells = [t for t in trades if t["type"] == "SELL"]
+
+    if buys:
+        ax.scatter(
+            [t["time"] for t in buys],
+            [t["price"] for t in buys],
+            color="green",
+            marker="^",
+            label="BUY",
+        )
+
+    if sells:
+        ax.scatter(
+            [t["time"] for t in sells],
+            [t["price"] for t in sells],
+            color="red",
+            marker="v",
+            label="SELL",
+        )
+
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Price (USD)")
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig(outfile)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Blockasset price prediction")
     parser.add_argument(
@@ -384,6 +420,7 @@ def main() -> None:
         print("First 3 trades:")
         for t in trader.trades[:3]:
             print(f"{t['time']:%Y-%m-%d %H:%M} {t['type']} at ${t['price']:.4f} qty {t['qty']:.4f}")
+        plot_trades(raw_df, trader.trades)
 
 
 if __name__ == "__main__":
